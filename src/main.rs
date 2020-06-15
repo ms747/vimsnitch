@@ -127,7 +127,7 @@ impl<'a> Gitignore<'a> {
         contents
             .lines()
             .filter_map(|line| {
-                if !line.trim().is_empty() {
+                if !line.trim().is_empty() && !line.starts_with('#') {
                     Pattern::new(line, root).ok()
                 } else {
                     None
@@ -144,6 +144,16 @@ impl<'a> Gitignore<'a> {
         self.included
     }
 
+    fn pattern_found(&self, path: &'a Path, is_dir: bool) -> bool {
+        self.patterns.iter().fold(false, |acc, pattern: &Pattern| {
+            if pattern.is_excluded(&path, is_dir) {
+                true
+            } else {
+                acc
+            }
+        })
+    }
+
     fn visit_files(&mut self, path: &Path) {
         if let Ok(entries) = fs::read_dir(path) {
             for entry in entries {
@@ -156,22 +166,18 @@ impl<'a> Gitignore<'a> {
                     }
 
                     if path.is_dir() {
-                        let found: bool =
-                            self.patterns.iter().fold(false, |acc, pattern: &Pattern| {
-                                if pattern.is_excluded(&path, true) {
-                                    true
-                                } else {
-                                    acc
-                                }
-                            });
+                        let found: bool = self.pattern_found(&path, true);
 
                         if found {
                             continue;
                         }
+
                         Gitignore::visit_files(self, &path);
                     } else {
                         // Collect ignored files
-                        self.included.push(path);
+                        if !self.pattern_found(&path, false) {
+                            self.included.push(path);
+                        }
                     }
                 }
             }
@@ -189,5 +195,5 @@ fn main() {
     let current_path = Path::new(&current_dir);
     let mut gitignore = Gitignore::new(current_path);
     gitignore.included_files();
-    dbg!(gitignore.get_files());
+    dbg!(gitignore.patterns.len());
 }
