@@ -195,5 +195,7 @@ fn main() {
     let current_path = Path::new(&current_dir);
     let mut gitignore = Gitignore::new(current_path);
     gitignore.included_files();
-    dbg!(gitignore.patterns.len());
+    for file in gitignore.get_files().iter() {
+        println!("{}", file.to_str().unwrap());
+    }
 }
