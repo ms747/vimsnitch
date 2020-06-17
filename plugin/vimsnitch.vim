@@ -8,7 +8,7 @@ let s:Add = 'add'
 let s:Multiply = 'multiply'
 
 " The path to the binary that was created out of 'cargo build' or 'cargo build --release". This will generally be 'target/release/name'
-let s:bin = '/home/ms/tank/Programming/vimsnitch/target/debug/vimsnitch'
+let s:bin = '/home/ms/tank/Programming/vimsnitch/target/debug/plugin'
 
 " Entry point. Initialize RPC. If it succeeds, then attach commands to the `rpcnotify` invocations.
 function! s:connect()
