@@ -42,13 +42,12 @@ impl<'a> Gitignore<'a> {
     }
 
     fn pattern_found(&self, path: &'a Path, is_dir: bool) -> bool {
-        self.patterns.iter().fold(false, |acc, pattern: &Pattern| {
-            if pattern.is_excluded(&path, is_dir) {
-                true
-            } else {
-                acc
+        for pat in self.patterns.iter() {
+            if pat.is_excluded(&path, is_dir) {
+                return true;
             }
-        })
+        }
+        return false;
     }
 
     pub fn visit_files(&mut self, path: &Path) {
