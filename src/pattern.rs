@@ -9,6 +9,8 @@ pub struct Pattern<'a> {
     pub anchored: bool,
 }
 
+// plugin/vimsnitch.vim
+
 impl<'a> Pattern<'a> {
     pub fn new(raw_pattern: &str, root: &'a Path) -> Result<Self, String> {
         let mut pattern = raw_pattern.to_string();
@@ -64,9 +66,10 @@ impl<'a> Pattern<'a> {
     fn anchored_pattern(pattern: &str, root: &Path) -> String {
         let mut root_path = root.to_str().unwrap().to_string();
 
-        if root_path.ends_with('/') {
-            root_path.pop();
+        if !root_path.ends_with('/') && !pattern.starts_with('/') {
+            root_path.push('/');
         }
+
         root_path + pattern
     }
 
