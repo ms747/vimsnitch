@@ -1,6 +1,5 @@
-use vimsnitch::gitignore::Gitignore;
-
 use std::path::Path;
+use vimsnitch::gitignore::Gitignore;
 
 fn main() {
     let mut current_dir = std::env::current_dir()
