@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashMap;
+use std::env::current_dir;
 use std::path::Path;
 
 use vimsnitch::gitignore::Gitignore;
@@ -33,18 +34,15 @@ fn main() {
     // TODO : Todo 1
     let mut storage: Matched = HashMap::new();
 
-    let mut current_dir = std::env::current_dir()
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
-    current_dir.push_str("/.gitignore");
-    let current_path = Path::new(&current_dir);
+    let mut current_path = current_dir().unwrap();
+    current_path.push(".gitignore");
+    let current_path = Path::new(current_path.to_str().unwrap());
+
     let mut ignore = Gitignore::new(current_path);
     ignore.included_files();
 
     // TODO : Todo 2
-    let todo_regex = Regex::new(r"^//\s+TODO").unwrap();
+    let todo_regex = Regex::new(r"^//\s+TODO\s+:\s+(.+)").unwrap();
 
     let mut found = false;
 
