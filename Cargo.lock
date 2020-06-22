@@ -1640,6 +1640,7 @@ name = "vimsnitch"
 version = "0.1.0"
 dependencies = [
  "async-std",
+ "futures 0.3.5",
  "glob",
  "http-types",
  "neovim-lib",
