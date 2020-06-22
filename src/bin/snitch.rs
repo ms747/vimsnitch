@@ -4,31 +4,7 @@ use std::env::current_dir;
 use std::path::Path;
 
 use vimsnitch::gitignore::Gitignore;
-
-type File = String;
-
-#[derive(Debug)]
-struct MatchedLine {
-    line_num: usize,
-    line: String,
-}
-
-impl MatchedLine {
-    fn new(line_num: usize, line: &str) -> Self {
-        MatchedLine {
-            line_num,
-            line: line.to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for MatchedLine {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:    {}", self.line_num, self.line)
-    }
-}
-
-type Matched = HashMap<File, Vec<MatchedLine>>;
+use vimsnitch::matched::{Matched, MatchedLine};
 
 fn main() {
     // TODO : Todo 1
