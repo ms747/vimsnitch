@@ -1,4 +1,5 @@
 use async_std::task;
+use futures::future::try_join_all;
 use http_types::headers::HeaderValue;
 use serde::{Deserialize, Serialize};
 
@@ -42,6 +43,69 @@ impl GitIssue {
                 .recv_json::<Vec<Issue>>()
                 .await?;
             Ok(response)
+        })
+    }
+
+    pub fn create_many(&self, title: &Vec<&str>) -> Result<Vec<Issue>, http_types::Error> {
+        task::block_on(async {
+            let mut issues = try_join_all(title.into_iter().map(|tit| {
+                surf::post(&self.url)
+                    .set_header("User-Agent", "vimsnitch")
+                    .set_header("Authorization", self.get_token())
+                    .body_json(&serde_json::json!({ "title": tit }))
+                    .unwrap()
+            }))
+            .await
+            .unwrap();
+
+            let mut new_issues: Vec<Issue> = vec![];
+
+            for (i, issue) in issues.iter_mut().enumerate() {
+                if issue.status() == 201 {
+                    let body = issue.body_string().await.unwrap();
+                    let body = serde_json::from_str::<Issue>(&body).unwrap();
+                    new_issues.push(body);
+                } else {
+                    return Err(http_types::Error::from_str(
+                        issue.status(),
+                        format!(
+                            "Failed to create new Issue : {}",
+                            &title.iter().nth(i).unwrap()
+                        ),
+                    ));
+                }
+            }
+            Ok(new_issues)
+        })
+    }
+
+    pub fn close_many(&self, title: &Vec<u32>) -> Result<Vec<Issue>, http_types::Error> {
+        task::block_on(async {
+            let mut bodies: Vec<_> = try_join_all(title.iter().map(|tit| {
+                surf::patch(&format!("{}/{}", &self.url, tit))
+                    .set_header("User-Agent", "vimsnitch")
+                    .set_header("Authorization", self.get_token())
+                    .body_json(&serde_json::json!({ "state": "closed" }))
+                    .unwrap()
+            }))
+            .await
+            .unwrap();
+
+            let mut closed_issue: Vec<Issue> = vec![];
+
+            for (i, body) in bodies.iter_mut().enumerate() {
+                if body.status() == 200 {
+                    let data = body.body_string().await.unwrap();
+                    let data = serde_json::from_str::<Issue>(&data).unwrap();
+                    closed_issue.push(data);
+                } else {
+                    return Err(http_types::Error::from_str(
+                        body.status(),
+                        format!("Failed to close Issue : {}", &title.iter().nth(i).unwrap()),
+                    ));
+                }
+            }
+            Ok(closed_issue)
         })
     }
 
