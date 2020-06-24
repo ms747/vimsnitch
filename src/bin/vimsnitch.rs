@@ -1,25 +1,45 @@
 use regex::Regex;
 use std::collections::HashMap;
-use std::env::current_dir;
 use std::path::Path;
 
 use vimsnitch::gitignore::Gitignore;
 use vimsnitch::gitissue::GitIssue;
 use vimsnitch::matched::{Matched, MatchedLine};
 
+use git2::Repository;
+
 fn main() -> Result<(), http_types::Error> {
+    let repo = match Repository::discover(".") {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Not a git repository : {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let remote = match repo.find_remote("origin") {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("No remotes set : {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    let mut path = repo.path().parent().unwrap().to_path_buf();
+    path.push(".gitignore");
+
+    let url: String = remote.url().unwrap().split(':').skip(1).collect();
+    let url: Vec<&str> = url.split('/').collect();
+
+    let owner = url[0];
+    let repo: String = url[1].split('.').take(1).collect();
+
+    // TODO(#31) : Pull token from some env
+    let issues = GitIssue::new(owner, &repo, "126562439d17dc58ab483485ff006b4af0ef07d3");
+
     let mut storage: Matched = HashMap::new();
-
-    let issues = GitIssue::new(
-        "ms747",
-        "vimsnitch.git",
-        "126562439d17dc58ab483485ff006b4af0ef07d3",
-    );
-
-    let mut current_path = current_dir().unwrap();
-    current_path.push(".gitignore");
     // TODO(#28) : Remove all unwraps
-    let current_path = Path::new(current_path.to_str().unwrap());
+    let current_path = Path::new(path.to_str().unwrap());
 
     let mut ignore = Gitignore::new(current_path);
     ignore.included_files();
@@ -52,11 +72,15 @@ fn main() -> Result<(), http_types::Error> {
     }
 
     let mut todos = vec![];
-    for (file, matches) in storage.iter() {
-        println!("{}", &file[1..]);
-        for capture in matches.iter() {
-            todos.push(capture.get_line());
-            println!("{}", capture);
+    if storage.len() == 0 {
+        println!("No Todos found :)");
+    } else {
+        for (file, matches) in storage.iter() {
+            println!("{}", &file[1..]);
+            for capture in matches.iter() {
+                todos.push(capture.get_line());
+                println!("{}", capture);
+            }
         }
     }
 
