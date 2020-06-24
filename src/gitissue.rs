@@ -1,4 +1,3 @@
-use async_std::task;
 use futures::future::try_join_all;
 use http_types::headers::HeaderValue;
 use serde::{Deserialize, Serialize};
@@ -29,8 +28,9 @@ impl GitIssue {
         }
     }
 
+    // TODO(#33) : Replace with smol since async_std is causing memory leak
     pub fn get(&self, state: IssueState) -> Result<Vec<Issue>, http_types::Error> {
-        task::block_on(async {
+        smol::block_on(async {
             let mut url = String::from(&self.url);
 
             if state == IssueState::Closed {
@@ -47,7 +47,7 @@ impl GitIssue {
     }
 
     pub fn create_many(&self, title: &Vec<&str>) -> Result<Vec<Issue>, http_types::Error> {
-        task::block_on(async {
+        smol::block_on(async {
             let mut issues = try_join_all(title.into_iter().map(|tit| {
                 surf::post(&self.url)
                     .set_header("User-Agent", "vimsnitch")
@@ -80,7 +80,7 @@ impl GitIssue {
     }
 
     pub fn close_many(&self, title: &Vec<u32>) -> Result<Vec<Issue>, http_types::Error> {
-        task::block_on(async {
+        smol::block_on(async {
             let mut bodies: Vec<_> = try_join_all(title.iter().map(|tit| {
                 surf::patch(&format!("{}/{}", &self.url, tit))
                     .set_header("User-Agent", "vimsnitch")
@@ -110,7 +110,7 @@ impl GitIssue {
     }
 
     pub fn create(&self, title: &str) -> Result<Issue, http_types::Error> {
-        task::block_on(async {
+        smol::block_on(async {
             let mut response = surf::post(&self.url)
                 .set_header("User-Agent", "vimsnitch")
                 .set_header("Authorization", self.get_token())
@@ -130,7 +130,7 @@ impl GitIssue {
     }
 
     pub fn close(&self, issue: u32) -> Result<Issue, http_types::Error> {
-        task::block_on(async {
+        smol::block_on(async {
             let mut response = surf::patch(&format!("{}/{}", &self.url, issue))
                 .set_header("User-Agent", "vimsnitch")
                 .set_header("Authorization", self.get_token())
