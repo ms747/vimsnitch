@@ -29,6 +29,7 @@ impl GitIssue {
     }
 
     // TODO(#33) : Replace with smol since async_std is causing memory leak
+
     pub fn get(&self, state: IssueState) -> Result<Vec<Issue>, http_types::Error> {
         smol::block_on(async {
             let mut url = String::from(&self.url);
