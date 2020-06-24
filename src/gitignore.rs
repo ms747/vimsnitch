@@ -1,15 +1,16 @@
 use crate::pattern::Pattern;
 use std::fs;
 use std::path::{Path, PathBuf};
+
 #[derive(Debug)]
-pub struct Gitignore<'a> {
-    pub patterns: Vec<Pattern<'a>>,
-    pub root: &'a Path,
+pub struct Gitignore<'git> {
+    pub patterns: Vec<Pattern<'git>>,
+    pub root: &'git Path,
     pub included: Vec<PathBuf>,
 }
 
-impl<'a> Gitignore<'a> {
-    pub fn new(gitignore_path: &'a Path) -> Self {
+impl<'git> Gitignore<'git> {
+    pub fn new(gitignore_path: &'git Path) -> Self {
         let root = gitignore_path.parent().unwrap();
         let patterns = Gitignore::patterns(gitignore_path, root);
         Gitignore {
@@ -19,8 +20,14 @@ impl<'a> Gitignore<'a> {
         }
     }
 
-    fn patterns(path: &'a Path, root: &'a Path) -> Vec<Pattern<'a>> {
-        let contents = fs::read_to_string(path).expect("Unable to Read Line");
+    fn patterns(path: &'git Path, root: &'git Path) -> Vec<Pattern<'git>> {
+        let contents = match fs::read_to_string(path) {
+            Ok(data) => data,
+            Err(e) => {
+                eprintln!("Error : {}", e);
+                std::process::exit(1);
+            }
+        };
         contents
             .lines()
             .filter_map(|line| {
@@ -41,7 +48,7 @@ impl<'a> Gitignore<'a> {
         self.included
     }
 
-    fn pattern_found(&self, path: &'a Path, is_dir: bool) -> bool {
+    fn pattern_found(&self, path: &'git Path, is_dir: bool) -> bool {
         for pat in self.patterns.iter() {
             if pat.is_excluded(&path, is_dir) {
                 return true;
