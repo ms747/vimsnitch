@@ -9,6 +9,15 @@ use vimsnitch::matched::{Matched, MatchedLine};
 use git2::Repository;
 
 fn main() -> Result<(), http_types::Error> {
+    // TODO(#35) : Check
+    let git_token = match std::env::var("GIT") {
+        Ok(token) => token,
+        Err(_) => {
+            eprintln!("Variable $GIT not set");
+            std::process::exit(1);
+        }
+    };
+
     let repo = match Repository::discover(".") {
         Ok(r) => r,
         Err(e) => {
@@ -35,7 +44,7 @@ fn main() -> Result<(), http_types::Error> {
     let repo: String = url[1].split('.').take(1).collect();
 
     // TODO(#31) : Pull token from some env
-    let issues = GitIssue::new(owner, &repo, "126562439d17dc58ab483485ff006b4af0ef07d3");
+    let issues = GitIssue::new(owner, &repo, &git_token);
 
     let mut storage: Matched = HashMap::new();
     // TODO(#28) : Remove all unwraps
