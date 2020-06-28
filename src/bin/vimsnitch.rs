@@ -13,11 +13,12 @@ fn main() -> Result<(), http_types::Error> {
     let git_token = match std::env::var("GIT") {
         Ok(token) => token,
         Err(_) => {
-            eprintln!("Variable $GIT not set");
+            eprintln!("Variable : $GIT not set");
             std::process::exit(1);
         }
     };
 
+    // TODO(#36) : Later
     let repo = match Repository::discover(".") {
         Ok(r) => r,
         Err(e) => {
