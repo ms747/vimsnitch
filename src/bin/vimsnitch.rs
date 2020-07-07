@@ -82,7 +82,7 @@ fn main() -> Result<(), http_types::Error> {
     }
 
     let mut todos = vec![];
-    if storage.len() == 0 {
+    if storage.is_empty() {
         println!("No Todos found :)");
     } else {
         for (file, matches) in storage.iter() {

@@ -54,7 +54,7 @@ impl<'git> Gitignore<'git> {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     pub fn visit_files(&mut self, path: &Path) {

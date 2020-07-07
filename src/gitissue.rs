@@ -23,7 +23,7 @@ pub enum IssueState {
 impl GitIssue {
     pub fn new(owner: &str, repo: &str, token: &str) -> Self {
         GitIssue {
-            url: format!("https://api.github.com/repos/{}/{}/issues", owner, repo).to_string(),
+            url: format!("https://api.github.com/repos/{}/{}/issues", owner, repo),
             token: format!("token {}", token),
         }
     }
@@ -35,7 +35,7 @@ impl GitIssue {
             let mut url = String::from(&self.url);
 
             if state == IssueState::Closed {
-                url = url + "?state=closed";
+                url += "?state=closed";
             }
 
             let response = surf::get(&url)
@@ -47,9 +47,9 @@ impl GitIssue {
         })
     }
 
-    pub fn create_many(&self, title: &Vec<&str>) -> Result<Vec<Issue>, http_types::Error> {
+    pub fn create_many(&self, title: &[&str]) -> Result<Vec<Issue>, http_types::Error> {
         smol::block_on(async {
-            let mut issues = try_join_all(title.into_iter().map(|tit| {
+            let mut issues = try_join_all(title.iter().map(|tit| {
                 surf::post(&self.url)
                     .set_header("User-Agent", "vimsnitch")
                     .set_header("Authorization", self.get_token())
@@ -69,10 +69,7 @@ impl GitIssue {
                 } else {
                     return Err(http_types::Error::from_str(
                         issue.status(),
-                        format!(
-                            "Failed to create new Issue : {}",
-                            &title.iter().nth(i).unwrap()
-                        ),
+                        format!("Failed to create new Issue : {}", &title.get(i).unwrap()),
                     ));
                 }
             }
@@ -80,7 +77,7 @@ impl GitIssue {
         })
     }
 
-    pub fn close_many(&self, title: &Vec<u32>) -> Result<Vec<Issue>, http_types::Error> {
+    pub fn close_many(&self, title: &[&u32]) -> Result<Vec<Issue>, http_types::Error> {
         smol::block_on(async {
             let mut bodies: Vec<_> = try_join_all(title.iter().map(|tit| {
                 surf::patch(&format!("{}/{}", &self.url, tit))
@@ -102,7 +99,7 @@ impl GitIssue {
                 } else {
                     return Err(http_types::Error::from_str(
                         body.status(),
-                        format!("Failed to close Issue : {}", &title.iter().nth(i).unwrap()),
+                        format!("Failed to close Issue : {}", &title.get(i).unwrap()),
                     ));
                 }
             }
@@ -124,7 +121,7 @@ impl GitIssue {
             } else {
                 Err(http_types::Error::from_str(
                     response.status(),
-                    format!("Error : Failed to create Issue"),
+                    "Error: Failed to create Issue".to_string(),
                 ))
             }
         })
