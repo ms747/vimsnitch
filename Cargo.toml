@@ -21,6 +21,7 @@ http-types = "2.2.0"
 futures = "0.3"
 git2 = "0.13.6"
 smol = "0.1.18"
+structopt = "0.3.15"
 
 [profile.release]
 opt-level = 3

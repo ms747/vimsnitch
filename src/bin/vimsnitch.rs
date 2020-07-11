@@ -1,14 +1,25 @@
 use regex::Regex;
 use std::collections::HashMap;
 use std::path::Path;
+use structopt::StructOpt;
 
 use vimsnitch::gitignore::Gitignore;
-use vimsnitch::gitissue::GitIssue;
+use vimsnitch::gitissue::{GitIssue, IssueState};
 use vimsnitch::matched::{Matched, MatchedLine};
 
 use git2::Repository;
 
+#[derive(StructOpt, Debug)]
+struct Args {
+    #[structopt(short, long)]
+    show: Option<String>,
+    #[structopt(short)]
+    todo: Option<String>,
+}
+
 fn main() -> Result<(), http_types::Error> {
+    let args = Args::from_args();
+    println!("{:?}", args);
     // TODO(#35) : Check
     let git_token = match std::env::var("GIT") {
         Ok(token) => token,
@@ -46,6 +57,31 @@ fn main() -> Result<(), http_types::Error> {
 
     // TODO(#31) : Pull token from some env
     let issues = GitIssue::new(owner, &repo, &git_token);
+
+    if let Some(state) = args.show {
+        match &state[..] {
+            "o" => {
+                let open_issues = issues.get(IssueState::Open)?;
+                println!("Open Issues");
+                println!("{:#?}", open_issues);
+                std::process::exit(0);
+            }
+            "c" => {
+                let closed_issues = issues.get(IssueState::Closed)?;
+                println!("Closed Issues");
+                println!("{:?}", closed_issues);
+                std::process::exit(0);
+            }
+            _ => std::process::exit(1),
+        };
+    }
+
+    if let Some(todo) = args.todo {
+        match &todo[..] {
+            "show" | "s" => {}
+            _ => {}
+        }
+    }
 
     let mut storage: Matched = HashMap::new();
     // TODO(#28) : Remove all unwraps
