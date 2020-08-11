@@ -47,7 +47,7 @@ impl GitIssue {
         })
     }
 
-    pub fn create_many(&self, title: &[&str]) -> Result<Vec<Issue>, http_types::Error> {
+    pub fn create_many(&self, title: &[String]) -> Result<Vec<Issue>, http_types::Error> {
         smol::block_on(async {
             let mut issues = try_join_all(title.iter().map(|tit| {
                 surf::post(&self.url)

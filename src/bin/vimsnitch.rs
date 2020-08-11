@@ -1,25 +1,15 @@
 use regex::Regex;
-use std::collections::HashMap;
 use std::path::Path;
-use structopt::StructOpt;
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 
 use vimsnitch::gitignore::Gitignore;
-use vimsnitch::gitissue::{GitIssue, IssueState};
-use vimsnitch::matched::{Matched, MatchedLine};
+use vimsnitch::gitissue::GitIssue;
+use vimsnitch::matched::{File, MatchedLine};
 
 use git2::Repository;
 
-#[derive(StructOpt, Debug)]
-struct Args {
-    #[structopt(short, long)]
-    show: Option<String>,
-    #[structopt(short)]
-    todo: Option<String>,
-}
-
 fn main() -> Result<(), http_types::Error> {
-    let args = Args::from_args();
-    println!("{:?}", args);
     // TODO(#35) : Check
     let git_token = match std::env::var("GIT") {
         Ok(token) => token,
@@ -46,6 +36,9 @@ fn main() -> Result<(), http_types::Error> {
         }
     };
 
+    let mut threads = vec![];
+    let (tx, rx) = mpsc::channel::<(File, Vec<MatchedLine>)>();
+
     let mut path = repo.path().parent().unwrap().to_path_buf();
     path.push(".gitignore");
 
@@ -58,32 +51,6 @@ fn main() -> Result<(), http_types::Error> {
     // TODO(#31) : Pull token from some env
     let issues = GitIssue::new(owner, &repo, &git_token);
 
-    if let Some(state) = args.show {
-        match &state[..] {
-            "o" => {
-                let open_issues = issues.get(IssueState::Open)?;
-                println!("Open Issues");
-                println!("{:#?}", open_issues);
-                std::process::exit(0);
-            }
-            "c" => {
-                let closed_issues = issues.get(IssueState::Closed)?;
-                println!("Closed Issues");
-                println!("{:?}", closed_issues);
-                std::process::exit(0);
-            }
-            _ => std::process::exit(1),
-        };
-    }
-
-    if let Some(todo) = args.todo {
-        match &todo[..] {
-            "show" | "s" => {}
-            _ => {}
-        }
-    }
-
-    let mut storage: Matched = HashMap::new();
     // TODO(#28) : Remove all unwraps
     let current_path = Path::new(path.to_str().unwrap());
 
@@ -92,33 +59,49 @@ fn main() -> Result<(), http_types::Error> {
 
     let todo_regex = Regex::new(r"//\s*TODO\s*:\s*(.*)").unwrap();
 
-    let mut found = false;
+    for file in ignore.get_files().into_iter() {
+        let regex = todo_regex.clone();
+        let tx = tx.clone();
 
-    for file in ignore.get_files().iter() {
-        let file = file.to_str().unwrap();
-        let contents = std::fs::read_to_string(file).expect("Unable to open file");
-        let mut line_matches: Vec<MatchedLine> = vec![];
-        for (i, line) in contents.lines().enumerate() {
-            let line = line.trim();
-            let matches = todo_regex.captures(line);
-            if matches.iter().len() > 0 {
-                let matched = match &matches {
-                    Some(data) => data.get(1).unwrap().as_str().trim(),
-                    _ => panic!("Regular Expression Failed"),
-                };
-                line_matches.push(MatchedLine::new(i + 1, matched));
-                found = true;
+        threads.push(thread::spawn(move || {
+            let file = file.to_str().unwrap();
+            let contents = std::fs::read_to_string(file).expect("Unable to open file");
+
+            let mut line_matches: Vec<MatchedLine> = vec![];
+            let mut found = false;
+
+            for (i, line) in contents.lines().enumerate() {
+                let line = line.trim();
+                let matches = regex.captures(line);
+                if matches.iter().len() > 0 {
+                    let matched = match &matches {
+                        Some(data) => data.get(1).unwrap().as_str().trim(),
+                        _ => panic!("Regular Expression Failed"),
+                    };
+                    let line_count: usize = i + 1;
+                    line_matches.push(MatchedLine::new(line_count, matched));
+                    found = true;
+                }
             }
-        }
 
-        if found {
-            storage.insert(file.to_string(), line_matches);
-            found = false;
+            if found {
+                tx.send((file.to_string(), line_matches)).unwrap();
+            }
+        }));
+    }
+
+    let mut storage = vec![];
+
+    for thread in threads {
+        thread.join().unwrap();
+        if let Ok(data) = rx.try_recv() {
+            storage.push(data);
         }
     }
 
     let mut todos = vec![];
-    if storage.is_empty() {
+
+    if storage.iter().len() == 0 {
         println!("No Todos found :)");
     } else {
         for (file, matches) in storage.iter() {
@@ -130,39 +113,54 @@ fn main() -> Result<(), http_types::Error> {
         }
     }
 
-    // TODO(#29) : Better variable naming
-
     let new_issues = issues
-        .create_many(&todos)?
+        .create_many(&todos[..])?
         .iter()
         .map(|val| val.number as usize)
         .collect::<Vec<usize>>();
 
-    let mut new_issues_index = 0;
+    let mut write_threads = vec![];
+
+    let new_issues_index = Arc::new(Mutex::new(0));
+
     for (file, patterns) in storage.iter() {
-        let contents = std::fs::read_to_string(&file).expect("Unable to Read File");
-        let mut new_contents = String::new();
-        let mut pattern_index: usize = 0;
-        for (i, line) in contents.lines().enumerate() {
-            if pattern_index > patterns.len() - 1 {
-                pattern_index -= 1;
+        let todo_regex = todo_regex.clone();
+        let patterns = patterns.clone();
+        let file = file.clone();
+        let patterns = patterns.clone();
+        let new_issues_index = new_issues_index.clone();
+        let new_issues = new_issues.clone();
+        write_threads.push(thread::spawn(move || {
+            let mut new_issues_index = *new_issues_index.lock().unwrap() as usize;
+            let contents = std::fs::read_to_string(&file).expect("Unable to Read File");
+            let mut new_contents = String::new();
+            let mut pattern_index: usize = 0;
+            for (i, line) in contents.lines().enumerate() {
+                if pattern_index > patterns.len() - 1 {
+                    pattern_index -= 1;
+                }
+                if patterns[pattern_index].get_line_num() == i + 1 {
+                    let editied = todo_regex.replace(line, |capture: &regex::Captures| {
+                        format!(
+                            "// TODO(#{}) : {}",
+                            new_issues[new_issues_index], &capture[1]
+                        )
+                    });
+                    new_contents.push_str(&format!("{}\n", editied));
+                    pattern_index += 1;
+                    new_issues_index += 1;
+                    continue;
+                } else {
+                    new_contents.push_str(&format!("{}\n", line));
+                }
             }
-            if patterns[pattern_index].get_line_num() == i + 1 {
-                let editied = todo_regex.replace(line, |capture: &regex::Captures| {
-                    format!(
-                        "// TODO(#{}) : {}",
-                        new_issues[new_issues_index], &capture[1]
-                    )
-                });
-                new_contents.push_str(&format!("{}\n", editied));
-                pattern_index += 1;
-                new_issues_index += 1;
-                continue;
-            } else {
-                new_contents.push_str(&format!("{}\n", line));
-            }
-        }
-        std::fs::write(file, new_contents.as_str()).expect("Unable to Write File");
+            std::fs::write(file, new_contents.as_str()).expect("Unable to Write File");
+        }));
     }
+
+    for thread in write_threads {
+        thread.join().unwrap();
+    }
+
     Ok(())
 }
