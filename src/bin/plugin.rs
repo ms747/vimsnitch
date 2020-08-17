@@ -1,3 +1,4 @@
+// TODO : Integrate snitch with neovim
 use neovim_lib::{Neovim, NeovimApi, Session};
 
 struct Calculator;

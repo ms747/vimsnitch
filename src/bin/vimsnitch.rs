@@ -7,6 +7,7 @@ use vimsnitch::gitignore::Gitignore;
 use vimsnitch::gitissue::GitIssue;
 use vimsnitch::matched::{File, MatchedLine};
 
+use ansi_term::Colour;
 use git2::Repository;
 
 fn main() -> Result<(), http_types::Error> {
@@ -36,8 +37,7 @@ fn main() -> Result<(), http_types::Error> {
         }
     };
 
-    let mut threads = vec![];
-    let (tx, rx) = mpsc::channel::<(File, Vec<MatchedLine>)>();
+    let base_path = std::env::current_dir().unwrap();
 
     let mut path = repo.path().parent().unwrap().to_path_buf();
     path.push(".gitignore");
@@ -49,7 +49,7 @@ fn main() -> Result<(), http_types::Error> {
     let repo: String = url[1].split('.').take(1).collect();
 
     // TODO(#31) : Pull token from some env
-    let issues = GitIssue::new(owner, &repo, &git_token);
+    let issues = GitIssue::new(&owner, &repo, &git_token);
 
     // TODO(#28) : Remove all unwraps
     let current_path = Path::new(path.to_str().unwrap());
@@ -58,6 +58,9 @@ fn main() -> Result<(), http_types::Error> {
     ignore.included_files();
 
     let todo_regex = Regex::new(r"//\s*TODO\s*:\s*(.*)").unwrap();
+
+    let mut threads = vec![];
+    let (tx, rx) = mpsc::channel::<(File, Vec<MatchedLine>)>();
 
     for file in ignore.get_files().into_iter() {
         let regex = todo_regex.clone();
@@ -99,13 +102,18 @@ fn main() -> Result<(), http_types::Error> {
         }
     }
 
+    // TODO: Add terminal colour
     let mut todos = vec![];
 
     if storage.iter().len() == 0 {
-        println!("No Todos found :)");
+        println!("{}", Colour::Green.paint("No Todos found :)"));
     } else {
         for (file, matches) in storage.iter() {
-            println!("{}", &file[1..]);
+            let file = std::path::Path::new(file);
+            println!(
+                "{}",
+                Colour::Purple.paint(file.strip_prefix(&base_path).unwrap().display().to_string())
+            );
             for capture in matches.iter() {
                 todos.push(capture.get_line());
                 println!("{}", capture);
