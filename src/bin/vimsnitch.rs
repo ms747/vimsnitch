@@ -8,8 +8,7 @@ use vimsnitch::matched::{Matched, MatchedLine};
 
 use git2::Repository;
 
-fn main() -> Result<(), http_types::Error> {
-    // TODO(#35) : Check
+fn get_git_token() -> String {
     let git_token = match std::env::var("GIT") {
         Ok(token) => token,
         Err(_) => {
@@ -17,8 +16,10 @@ fn main() -> Result<(), http_types::Error> {
             std::process::exit(1);
         }
     };
+    git_token
+}
 
-    // TODO(#36) : Later
+fn get_repo_path() -> git2::Repository {
     let repo = match Repository::discover(".") {
         Ok(r) => r,
         Err(e) => {
@@ -26,7 +27,10 @@ fn main() -> Result<(), http_types::Error> {
             std::process::exit(1);
         }
     };
+    repo
+}
 
+fn get_remote(repo: &git2::Repository) -> git2::Remote {
     let remote = match repo.find_remote("origin") {
         Ok(r) => r,
         Err(e) => {
@@ -34,18 +38,37 @@ fn main() -> Result<(), http_types::Error> {
             std::process::exit(1);
         }
     };
+    remote
+}
 
+fn get_repo_local_path(repo: &git2::Repository) -> std::path::PathBuf {
     let mut path = repo.path().parent().unwrap().to_path_buf();
     path.push(".gitignore");
+    path
+}
 
+fn get_repo_url<'a>(remote: &git2::Remote) -> String {
     let url: String = remote.url().unwrap().split(':').skip(1).collect();
-    let url: Vec<&str> = url.split('/').collect();
+    url
+}
 
+fn get_owner_and_repo(url: Vec<&str>) -> (&str, String) {
     let owner = url[0];
     let repo: String = url[1].split('.').take(1).collect();
+    (owner, repo)
+}
 
-    // TODO(#31) : Pull token from some env
-    let issues = GitIssue::new(owner, &repo, &git_token);
+fn main() -> Result<(), http_types::Error> {
+    let git_token = get_git_token();
+    let repo = get_repo_path();
+    let remote = get_remote(&repo);
+    let path = get_repo_local_path(&repo);
+    let url = get_repo_url(&remote);
+    let url: Vec<&str> = url.split('/').collect();
+    let (owner, repo) = get_owner_and_repo(url);
+
+    // TODO : Test
+    let issues = GitIssue::new(&owner, &repo, &git_token);
 
     let mut storage: Matched = HashMap::new();
     // TODO(#28) : Remove all unwraps
@@ -96,37 +119,37 @@ fn main() -> Result<(), http_types::Error> {
 
     // TODO(#29) : Better variable naming
 
-    let new_issues = issues
-        .create_many(&todos)?
-        .iter()
-        .map(|val| val.number as usize)
-        .collect::<Vec<usize>>();
+    // let new_issues = issues
+    //     .create_many(&todos)?
+    //     .iter()
+    //     .map(|val| val.number as usize)
+    //     .collect::<Vec<usize>>();
 
-    let mut new_issues_index = 0;
-    for (file, patterns) in storage.iter() {
-        let contents = std::fs::read_to_string(&file).expect("Unable to Read File");
-        let mut new_contents = String::new();
-        let mut pattern_index: usize = 0;
-        for (i, line) in contents.lines().enumerate() {
-            if pattern_index > patterns.len() - 1 {
-                pattern_index -= 1;
-            }
-            if patterns[pattern_index].get_line_num() == i + 1 {
-                let editied = todo_regex.replace(line, |capture: &regex::Captures| {
-                    format!(
-                        "// TODO(#{}) : {}",
-                        new_issues[new_issues_index], &capture[1]
-                    )
-                });
-                new_contents.push_str(&format!("{}\n", editied));
-                pattern_index += 1;
-                new_issues_index += 1;
-                continue;
-            } else {
-                new_contents.push_str(&format!("{}\n", line));
-            }
-        }
-        std::fs::write(file, new_contents.as_str()).expect("Unable to Write File");
-    }
+    // let mut new_issues_index = 0;
+    // for (file, patterns) in storage.iter() {
+    //     let contents = std::fs::read_to_string(&file).expect("Unable to Read File");
+    //     let mut new_contents = String::new();
+    //     let mut pattern_index: usize = 0;
+    //     for (i, line) in contents.lines().enumerate() {
+    //         if pattern_index > patterns.len() - 1 {
+    //             pattern_index -= 1;
+    //         }
+    //         if patterns[pattern_index].get_line_num() == i + 1 {
+    //             let editied = todo_regex.replace(line, |capture: &regex::Captures| {
+    //                 format!(
+    //                     "// TODO(#{}) : {}",
+    //                     new_issues[new_issues_index], &capture[1]
+    //                 )
+    //             });
+    //             new_contents.push_str(&format!("{}\n", editied));
+    //             pattern_index += 1;
+    //             new_issues_index += 1;
+    //             continue;
+    //         } else {
+    //             new_contents.push_str(&format!("{}\n", line));
+    //         }
+    //     }
+    //     std::fs::write(file, new_contents.as_str()).expect("Unable to Write File");
+    // }
     Ok(())
 }
