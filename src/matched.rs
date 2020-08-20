@@ -1,12 +1,13 @@
-// TODO(#27) : Abtract matchedLines from main
-use std::collections::HashMap;
+use ansi_term::Colour;
+// TODO(#40) : Abtract matchedLines from main
 
-type File = String;
+// TODO(#41) : Implement memory efficent struct
+pub type File = String;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MatchedLine {
-    line_num: usize,
-    line: String,
+    pub line_num: usize,
+    pub line: String,
 }
 
 impl MatchedLine {
@@ -17,8 +18,8 @@ impl MatchedLine {
         }
     }
 
-    pub fn get_line(&self) -> &str {
-        self.line.as_str()
+    pub fn get_line(&self) -> String {
+        self.line.clone()
     }
 
     pub fn get_line_num(&self) -> usize {
@@ -28,8 +29,11 @@ impl MatchedLine {
 
 impl std::fmt::Display for MatchedLine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.line_num, self.line)
+        write!(
+            f,
+            "{}:{}",
+            Colour::Yellow.paint(format!("{}", self.line_num)),
+            Colour::Red.paint(format!("{}", self.line)),
+        )
     }
 }
-
-pub type Matched = HashMap<File, Vec<MatchedLine>>;
