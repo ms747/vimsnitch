@@ -1,4 +1,5 @@
 use regex::Regex;
+use std::fs::{read_to_string, write};
 use std::path::Path;
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
@@ -70,11 +71,8 @@ fn main() -> Result<(), http_types::Error> {
     let url: Vec<&str> = url.split('/').collect();
     let (owner, repo) = get_owner_and_repo(url);
 
-    // TODO(#45) : Test
-    // TODO(#31) : Pull token from some env
     let issues = GitIssue::new(&owner, &repo, &git_token);
 
-    // TODO(#28) : Remove all unwraps
     let current_path = Path::new(path.to_str().unwrap());
 
     let mut ignore = Gitignore::new(current_path);
@@ -91,7 +89,7 @@ fn main() -> Result<(), http_types::Error> {
 
         threads.push(thread::spawn(move || {
             let file = file.to_str().unwrap();
-            let contents = std::fs::read_to_string(file).expect("Unable to open file");
+            let contents = read_to_string(file).expect("Unable to open file");
 
             let mut line_matches: Vec<MatchedLine> = vec![];
             let mut found = false;
@@ -125,7 +123,6 @@ fn main() -> Result<(), http_types::Error> {
         }
     }
 
-    // TODO(#43) : Add terminal colour
     let mut todos = vec![];
 
     if storage.iter().len() == 0 {
@@ -144,7 +141,6 @@ fn main() -> Result<(), http_types::Error> {
         }
     }
 
-    // TODO(#29) : Better variable naming
     let new_issues = issues
         .create_many(&todos[..])?
         .iter()
@@ -164,7 +160,7 @@ fn main() -> Result<(), http_types::Error> {
         let new_issues = new_issues.clone();
         write_threads.push(thread::spawn(move || {
             let mut new_issues_index = *new_issues_index.lock().unwrap() as usize;
-            let contents = std::fs::read_to_string(&file).expect("Unable to Read File");
+            let contents = read_to_string(&file).expect("Unable to Read File");
             let mut new_contents = String::new();
             let mut pattern_index: usize = 0;
             for (i, line) in contents.lines().enumerate() {
@@ -186,7 +182,7 @@ fn main() -> Result<(), http_types::Error> {
                     new_contents.push_str(&format!("{}\n", line));
                 }
             }
-            std::fs::write(file, new_contents.as_str()).expect("Unable to Write File");
+            write(file, new_contents.as_str()).expect("Unable to Write File");
         }));
     }
 
