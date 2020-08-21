@@ -33,7 +33,7 @@ impl std::fmt::Display for MatchedLine {
             f,
             "{}:{}",
             Colour::Yellow.paint(format!("{}", self.line_num)),
-            Colour::Red.paint(format!("{}", self.line)),
+            Colour::Red.paint(self.line.to_string()),
         )
     }
 }

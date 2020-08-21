@@ -12,36 +12,33 @@ use ansi_term::Colour;
 use git2::Repository;
 
 fn get_git_token() -> String {
-    let git_token = match std::env::var("GIT") {
+    match std::env::var("GIT") {
         Ok(token) => token,
         Err(_) => {
             eprintln!("Variable : $GIT not set");
             std::process::exit(1);
         }
-    };
-    git_token
+    }
 }
 
 fn get_repo_path() -> git2::Repository {
-    let repo = match Repository::discover(".") {
+    match Repository::discover(".") {
         Ok(r) => r,
         Err(e) => {
             eprintln!("Not a git repository : {}", e);
             std::process::exit(1);
         }
-    };
-    repo
+    }
 }
 
 fn get_remote(repo: &git2::Repository) -> git2::Remote {
-    let remote = match repo.find_remote("origin") {
+    match repo.find_remote("origin") {
         Ok(r) => r,
         Err(e) => {
             eprintln!("No remotes set : {}", e);
             std::process::exit(1);
         }
-    };
-    remote
+    }
 }
 
 fn get_repo_local_path(repo: &git2::Repository) -> std::path::PathBuf {
@@ -50,7 +47,7 @@ fn get_repo_local_path(repo: &git2::Repository) -> std::path::PathBuf {
     path
 }
 
-fn get_repo_url<'a>(remote: &git2::Remote) -> String {
+fn get_repo_url(remote: &git2::Remote) -> String {
     let url: String = remote.url().unwrap().split(':').skip(1).collect();
     url
 }
